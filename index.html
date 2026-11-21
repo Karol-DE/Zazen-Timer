@@ -256,6 +256,9 @@ html.lib-dark #lib ::selection{background:rgba(255,255,255,.2)}
 .session.notice .controls{opacity:.3}
 .controls-buttons{display:flex;margin-left:auto}
 .controls-buttons>*+*{margin-left:8px}
+/* Größere Trefferfläche als sichtbar: Ein Tippen knapp daneben trifft trotzdem */
+.controls-buttons>*{position:relative}
+.controls-buttons>*:after{content:"";position:absolute;top:-16px;bottom:-16px;left:-4px;right:-4px}
 .wake-status{margin:0 12px 0 0;font-size:.8rem;color:var(--muted)}
 .wake-status.ok:before{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--text);opacity:.7;margin-right:8px;vertical-align:middle}
 .session.awake .controls{opacity:1;pointer-events:auto}
@@ -2078,6 +2081,25 @@ html.lib-dark #lib ::selection{background:rgba(255,255,255,.2)}
     if (!sessionEl.hidden && !turning) { drawEnso(); relayoutStreak(); updateGate(); }
     if (!libEl.hidden) paintCallig(libEl);
   });
+  /* iOS 26 und neuer, als App vom Home-Bildschirm: Nach dem Drehen (oder nach der Tastatur) schiebt iOS die Seite
+     manchmal um einige Dutzend Pixel weg, obwohl sie gar nicht scrollen kann. Die Knöpfe unten werden weiter an ihrer
+     Stelle gezeichnet, Berührungen landen aber versetzt: Einstellungen, Bibliothek und Beenden scheinen tot.
+     Solange das Startbild oder eine Runde zu sehen ist, rückt die Seite deshalb bei jeder Größenänderung und jedem
+     Verrutschen wieder ganz nach oben. iOS setzt den Versatz oft erst mit einem zweiten resize, das nur die Höhe ändert,
+     darum bei jedem und nach dem Drehen noch zweimal verzögert. Einstellungen und Bibliothek scrollen ganz normal. */
+  function keepTop(){
+    if (!document.body.classList.contains("sitting")) return;
+    var a = document.activeElement;
+    if (a && (a.tagName === "INPUT" || a.tagName === "TEXTAREA")) return;
+    var vv = window.visualViewport;
+    var off = (window.pageXOffset || 0) !== 0 || (window.pageYOffset || 0) !== 0 ||
+              (vv && (vv.scale || 1) < 1.01 && (Math.abs(vv.offsetTop || 0) > 0.5 || Math.abs(vv.offsetLeft || 0) > 0.5));
+    if (off) window.scrollTo(0, 0);
+  }
+  window.addEventListener("resize", keepTop);
+  window.addEventListener("scroll", keepTop, {passive:true});
+  window.addEventListener("orientationchange", function(){ keepTop(); setTimeout(keepTop, 350); setTimeout(keepTop, 1000); });
+  if (window.visualViewport) { window.visualViewport.addEventListener("resize", keepTop); window.visualViewport.addEventListener("scroll", keepTop); }
 
 
   /* ---------- Kalligrafie ----------
@@ -2892,6 +2914,7 @@ html.lib-dark #lib ::selection{background:rgba(255,255,255,.2)}
     setupEl.hidden = key !== "setup"; libEl.hidden = !inLib;
     if (key === "start") {
       shownKey = key;
+      window.scrollTo(0, 0);                      // aus einer gescrollten Einstellungsseite zurück: nichts darf verschoben bleiben (iOS 26)
       showStartView(firstStart); firstStart = false;
       return;
     }
